@@ -13,9 +13,15 @@ class Problem2:
         Returns:
             distances: (n, m) numpy array, pairwise distances
         """
-    #
-    # You code here
-    #
+        #
+        # You code here
+        distances = np.empty((features2.shape[1], features1.shape[1]))
+        for i in range(features2.shape[1]):
+            for j in range(features1.shape[1]):
+                distances[i, j] = np.linalg.norm(features2[:, i] - features1[:, j]) ** 2
+
+        return distances
+        #
 
     def find_matches(self, p1, p2, distances):
         """ Find pairs of corresponding interest points given the
@@ -30,11 +36,23 @@ class Problem2:
             pairs: (min(n,m), 4) numpy array s.t. each row holds
                 the coordinates of an interest point in p1 and p2.
         """
-        
-    #
-    # You code here
-    #
 
+        #
+        # You code here
+        n, m = distances.shape
+        pairs = np.empty((min(n, m), 4))
+
+        if n < m:
+            for i in range(n):
+                pairs[i, :2] = p1[np.where(distances[i, :] == min(distances[i, :]))]
+                pairs[i, 2:] = p2[i, :]
+        else:
+            for i in range(m):
+                pairs[i, :2] = p1[i, :]
+                pairs[i, 2:] = p2[np.where(distances[:, i] == min(distances[:, i]))]
+
+        return pairs
+        #
 
     def pick_samples(self, p1, p2, k):
         """ Randomly select k corresponding point pairs.
@@ -48,11 +66,24 @@ class Problem2:
             sample1: (k, 2) numpy array, selected k pairs in left image
             sample2: (k, 2) numpy array, selected k pairs in right image
         """
-        
-    #
-    # You code here
-    #
 
+        #
+        # You code here
+        p1_ = np.copy(p1)
+        p2_ = np.copy(p2)
+        np.random.shuffle(p1_)
+        np.random.shuffle(p2_)
+
+        sample1 = p1_[:k, :]
+        sample2 = p2_[:k, :]
+
+        # index_1 = np.random.randint(p1.shape[0], size=k)
+        # sample1 = p1[index_1]
+        # index_2 = np.random.randint(p2.shape[0], size=k)
+        # sample2 = p2[index_2]
+
+        return sample1, sample2
+        #
 
     def condition_points(self, points):
         """ Conditioning: Normalization of coordinates for numeric stability 
@@ -67,10 +98,18 @@ class Problem2:
             T: (3, 3) numpy array, transformation matrix for conditioning
         """
 
-    #
-    # You code here
-    #
+        #
+        # You code here
+        s = 1.0 / 2.0 * np.max(np.linalg.norm(points, axis=1))
+        t = np.mean(points, axis=0)
+        T = np.array([[1.0 / s, 0, -t[0] / s],
+                      [0, 1.0 / s, -t[1] / s],
+                      [0, 0, 1.0]])
+        points_ = np.hstack((points, np.ones(points.shape[0]).reshape(-1, 1)))
+        ps = (T @ points_.T).T
 
+        return ps, T
+        #
 
     def compute_homography(self, p1, p2, T1, T2):
         """ Estimate homography matrix from point correspondences of conditioned coordinates.
@@ -88,10 +127,29 @@ class Problem2:
             HC: (3, 3) numpy array, homography matrix with respect to the conditioned coordinates
         """
 
-    #
-    # You code here
-    #
+        #
+        # You code here
+        A = np.empty((2 * p1.shape[0], 9))
 
+        for i in range(p1.shape[0]):
+            x_ = p2[i, 0]
+            y_ = p2[i, 1]
+            A[2 * i, :] = np.array(
+                [0, 0, 0, p1[i, 0], p1[i, 1], p1[i, 2], -p1[i, 0] * y_, -p1[i, 1] * y_, -p1[i, 2] * y_])
+            A[2 * i + 1, :] = np.array(
+                [-p1[i, 0], -p1[i, 1], -p1[i, 2], 0, 0, 0, p1[i, 0] * x_, p1[i, 1] * x_, p1[i, 2] * x_])
+
+        # SVD decomposition
+        _, _, vh = np.linalg.svd(A)
+
+        HC = vh[-1, :].reshape(3, -1)
+        H = np.linalg.pinv(T2) @ HC @ T1
+        # normalize
+        HC = HC / HC[-1, -1]
+        H = H / H[-1, -1]
+
+        return H, HC
+        #
 
     def transform_pts(self, p, H):
         """ Transform p through the homography matrix H.  
@@ -104,10 +162,21 @@ class Problem2:
             points: (l, 2) numpy array, transformed points
         """
 
-    #
-    # You code here
-    #
+        #
+        # You code here
+        p_ = np.copy(p)
+        p_ = np.hstack((p_, np.ones(p_.shape[0]).reshape(-1, 1)))
 
+        points = (H @ p_.T).T
+
+        # normalization to reduce 3nd dimension in points
+        for i, point in enumerate(points):
+            if point[-1] != 0:
+                point = point / point[-1]
+            points[i, :] = point
+
+        return points[:, :2]
+        #
 
     def compute_homography_distance(self, H, p1, p2):
         """ Computes the pairwise symmetric homography distance.
@@ -120,10 +189,15 @@ class Problem2:
         Returns:
             dist: (l, ) numpy array containing the distances
         """
-    #
-    # You code here
-    #
 
+        #
+        # You code here
+
+        dist = np.linalg.norm(self.transform_pts(p1, H) - p2, axis=1) ** 2 + \
+                   np.linalg.norm(p1 - self.transform_pts(p2, np.linalg.pinv(H)), axis=1) ** 2
+
+        return dist
+        #
 
     def find_inliers(self, pairs, dist, threshold):
         """ Return and count inliers based on the homography distance. 
@@ -137,10 +211,18 @@ class Problem2:
             N: number of inliers
             inliers: (N, 4)
         """
-    #
-    # You code here
-    #
 
+        #
+        # You code here
+        if (dist < threshold).any():
+            N = np.sum(dist < threshold)
+            inliers = pairs[np.where(dist < threshold)]
+        else:
+            N = 0
+            inliers = np.empty((N, 4))
+
+        return N, inliers
+        #
 
     def ransac_iters(self, p, k, z):
         """ Computes the required number of iterations for RANSAC.
@@ -153,11 +235,11 @@ class Problem2:
         Returns:
             minimum number of required iterations
         """
-    #
-    # You code here
-    #
 
-
+        #
+        # You code here
+        return int(np.ceil(np.log(1 - z) / np.log(1 - p ** k)))
+        #
 
     def ransac(self, pairs, n_iters, k, threshold):
         """ RANSAC algorithm.
@@ -165,6 +247,7 @@ class Problem2:
         Args:
             pairs: (l, 4) numpy array containing matched keypoint pairs
             n_iters: number of ransac iterations
+            k: number of samples drawn per iteration
             threshold: inlier detection threshold
         
         Returns:
@@ -172,10 +255,34 @@ class Problem2:
             max_inliers: number of inliers N
             inliers: (N, 4) numpy array containing the coordinates of the inliers
         """
-    #
-    # You code here
-    #
 
+        #
+        # You code here
+        dist_ = 0
+        H = np.empty((3, 3))
+        max_inliers = 0
+        inliers = []
+
+        for i in range(n_iters):
+            p1, p2 = self.pick_samples(pairs[:, :2], pairs[:, 2:], k)
+            p1_ps, T_p1 = self.condition_points(p1)
+            p2_ps, T_p2 = self.condition_points(p2)
+            H_i, _ = self.compute_homography(p1_ps, p2_ps, T_p1, T_p2)
+            dist = self.compute_homography_distance(H_i, p1, p2)
+            N_i, inliers_i = self.find_inliers(pairs, dist, threshold)
+
+            # means of the homography distance specified above
+            dist_mean = np.mean(dist)
+            if N_i >= max_inliers and dist_mean < dist_:
+                H = H_i
+
+            if len(inliers_i) != 0:
+                max_inliers += N_i
+                for inlier in inliers_i:
+                    inliers.append(inlier.tolist())
+
+        return H, max_inliers, np.asarray(inliers)
+        #
 
     def recompute_homography(self, inliers):
         """ Recomputes the homography matrix based on all inliers.
@@ -186,6 +293,14 @@ class Problem2:
         Returns:
             H: (3, 3) numpy array, recomputed homography matrix
         """
-    #
-    # You code here
-    #
+        #
+        # You code here
+        if len(inliers) == 0:
+            H = np.empty((3, 3))
+        else:
+            p1_ps, T_p1 = self.condition_points(inliers[:, :2])
+            p2_ps, T_p2 = self.condition_points(inliers[:, 2:])
+            H, _ = self.compute_homography(p1_ps, p2_ps, T_p1, T_p2)
+
+        return H
+        #
