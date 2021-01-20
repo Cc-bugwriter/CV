@@ -73,9 +73,6 @@ class Problem2:
         p2_ = np.copy(p2)
         np.random.shuffle(p1_)
         np.random.shuffle(p2_)
-        #
-        # sample1 = p1_[:k, :]
-        # sample2 = p2_[:k, :]
 
         index_1 = np.random.randint(p1.shape[0], size=k)
         sample1 = p1_[index_1]
@@ -267,7 +264,7 @@ class Problem2:
 
         #
         # You code here
-        dist_ = 0
+        dist_ = 2e4
         H = np.empty((3, 3))
         max_inliers = 0
         best_inliers = 0
@@ -289,17 +286,26 @@ class Problem2:
 
             if N_i > best_inliers or \
                     (N_i == best_inliers and dist_mean < dist_):
+            # if len(inliers_i) != 0 and dist_mean < dist_:
                 H = H_i
                 dist_ = dist_mean
                 best_inliers = N_i
+                # print(N_i)
+                # print(len(inliers_i))
+                # print(dist_mean)
+                # max_inliers += N_i
+                # for inlier in inliers_i:
+                #     inliers.append(inlier.tolist())
 
             if len(inliers_i) != 0:
                 max_inliers += N_i
                 for inlier in inliers_i:
                     inliers.append(inlier.tolist())
-                    print(inlier)
 
-        return H, max_inliers, np.asarray(inliers)
+        inliers_array = np.asarray(inliers)
+
+        # return H, max_inliers, np.asarray(inliers)[3:]
+        return H, max_inliers, inliers_array
         #
 
     def recompute_homography(self, inliers):
@@ -315,6 +321,28 @@ class Problem2:
         # You code here
         if len(inliers) == 0:
             H = np.empty((3, 3))
+            # possible H matrix
+            # [[1.17392289e+00 -5.77082033e-02 -2.10266472e+02]
+            #  [1.56935833e-01  1.22326315e+00 -5.52129965e+01]
+            #  [4.72118770e-04 3.05875508e-04  1.00000000e+00]]
+            # [[7.22089504e-01 - 5.36837222e-01 -7.43742921e+00]
+            #  [2.53040613e-01  4.23592935e-01 -1.26596114e+00]
+            #  [9.52979225e-04 - 2.22816468e-03 1.00000000e+00]]
+            # [[2.55254493e+01  9.28108309e+00 -6.18116175e+03]
+            #  [1.01401621e+01  1.93294021e+01 -3.12980935e+03]
+            #  [4.62266803e-02  1.53791051e-02 1.00000000e+00]]
+            # [[1.01437245e+00 -2.95655209e-01 -1.39701205e+02]
+            #  [2.06548555e-01 1.59763011e+00 -1.18115538e+02]
+            #  [-4.09437377e-04 1.99710535e-03 1.00000000e+00]]
+            # [[2.12898423e+00 -3.50242016e-01 -3.59719197e+02]
+            #  [5.40436917e-01 8.53914674e-01 -4.92351929e+01]
+            #  [4.01816657e-03 -2.38609861e-03 1.00000000e+00]]
+            # [[-2.17149512e+01  3.47410783e+00 3.85870287e+03]
+            #  [-1.35288452e+01 -8.55272136e+00 2.65301309e+03]
+            # [-5.55880467e-02 4.92369876e-03 1.00000000e+00]]
+            # [[-2.52809922e+01 -4.49018097e+00  5.87029674e+03]
+            #  [-1.39336260e+01 -2.64284143e+01  4.64840959e+03]
+            #  [-5.23800378e-02 -3.91470768e-02 1.00000000e+00]]
         else:
             p1_ps, T_p1 = self.condition_points(inliers[:, :2])
             p2_ps, T_p2 = self.condition_points(inliers[:, 2:])
