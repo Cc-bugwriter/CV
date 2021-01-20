@@ -69,15 +69,19 @@ class Problem2:
 
         #
         # You code here
-        p1_ = np.copy(p1)
-        p2_ = np.copy(p2)
-        np.random.shuffle(p1_)
-        np.random.shuffle(p2_)
+        # p1_ = np.copy(p1)
+        # p2_ = np.copy(p2)
+        # np.random.shuffle(p1_)
+        # np.random.shuffle(p2_)
+        #
+        # index_1 = np.random.randint(p1.shape[0], size=k)
+        # sample1 = p1_[index_1]
+        # index_2 = np.random.randint(p2.shape[0], size=k)
+        # sample2 = p2_[index_2]
 
-        index_1 = np.random.randint(p1.shape[0], size=k)
-        sample1 = p1_[index_1]
-        index_2 = np.random.randint(p2.shape[0], size=k)
-        sample2 = p2_[index_2]
+        index_ = np.random.randint(p1.shape[0], size=k)
+        sample1 = p1[index_]
+        sample2 = p2[index_]
 
         return sample1, sample2
         #
@@ -225,7 +229,7 @@ class Problem2:
             inliers = pairs[np.where(dist <= threshold)]
         else:
             N = 0
-            inliers = np.empty((N, 4))
+            inliers = np.zeros((N, 4))
 
         return N, inliers
         #
@@ -284,8 +288,9 @@ class Problem2:
             # means of the homography distance specified above
             dist_mean = np.mean(dist)
 
-            if N_i > best_inliers or \
-                    (N_i == best_inliers and dist_mean < dist_):
+            # if N_i > best_inliers or \
+            #         (N_i == best_inliers and dist_mean < dist_):
+            if N_i > best_inliers:
             # if len(inliers_i) != 0 and dist_mean < dist_:
                 H = H_i
                 dist_ = dist_mean
@@ -293,18 +298,17 @@ class Problem2:
                 # print(N_i)
                 # print(len(inliers_i))
                 # print(dist_mean)
-                # max_inliers += N_i
-                # for inlier in inliers_i:
-                #     inliers.append(inlier.tolist())
-
-            if len(inliers_i) != 0:
                 max_inliers += N_i
                 for inlier in inliers_i:
                     inliers.append(inlier.tolist())
 
+            # if len(inliers_i) != 0:
+            #     max_inliers += N_i
+            #     for inlier in inliers_i:
+            #         inliers.append(inlier.tolist())
+
         inliers_array = np.asarray(inliers)
 
-        # return H, max_inliers, np.asarray(inliers)[3:]
         return H, max_inliers, inliers_array
         #
 
