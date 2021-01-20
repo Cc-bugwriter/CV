@@ -73,20 +73,20 @@ class Problem2:
         p2_ = np.copy(p2)
         np.random.shuffle(p1_)
         np.random.shuffle(p2_)
+        #
+        # sample1 = p1_[:k, :]
+        # sample2 = p2_[:k, :]
 
-        sample1 = p1_[:k, :]
-        sample2 = p2_[:k, :]
-
-        # index_1 = np.random.randint(p1.shape[0], size=k)
-        # sample1 = p1[index_1]
-        # index_2 = np.random.randint(p2.shape[0], size=k)
-        # sample2 = p2[index_2]
+        index_1 = np.random.randint(p1.shape[0], size=k)
+        sample1 = p1_[index_1]
+        index_2 = np.random.randint(p2.shape[0], size=k)
+        sample2 = p2_[index_2]
 
         return sample1, sample2
         #
 
     def condition_points(self, points):
-        """ Conditioning: Normalization of coordinates for numeric stability 
+        """ Conditioning: Normalization of coordinates for numeric stability
         by substracting the mean and dividing by half of the component-wise
         maximum absolute value.
         Further, turns coordinates into homogeneous coordinates.
@@ -100,11 +100,18 @@ class Problem2:
 
         #
         # You code here
-        s = 1.0 / 2.0 * np.max(np.linalg.norm(points, axis=1))
+
+        # s = 1.0 / 2.0 * np.max(np.linalg.norm(points, axis=1))
+        s = 1.0 / 2.0 * np.max(np.abs(points), axis=0)
         t = np.mean(points, axis=0)
-        T = np.array([[1.0 / s, 0, -t[0] / s],
-                      [0, 1.0 / s, -t[1] / s],
-                      [0, 0, 1.0]])
+
+        # T = np.array([[1.0 / s, 0., -t[0] / s],
+        #               [0., 1.0 / s, -t[1] / s],
+        #               [0., 0., 1.0]])
+        T = np.array([[1.0 / s[0], 0., -t[0] / s[0]],
+                      [0., 1.0 / s[1], -t[1] / s[1]],
+                      [0., 0., 1.0]])
+
         points_ = np.hstack((points, np.ones(points.shape[0]).reshape(-1, 1)))
         ps = (T @ points_.T).T
 
@@ -121,7 +128,7 @@ class Problem2:
             p2: (l, 3) numpy array, the conditioned homogeneous coordinates of interest points in img2
             T1: (3,3) numpy array, conditioning matrix for p1
             T2: (3,3) numpy array, conditioning matrix for p2
-        
+
         Returns:
             H: (3, 3) numpy array, homography matrix with respect to unconditioned coordinates
             HC: (3, 3) numpy array, homography matrix with respect to the conditioned coordinates
@@ -152,12 +159,12 @@ class Problem2:
         #
 
     def transform_pts(self, p, H):
-        """ Transform p through the homography matrix H.  
+        """ Transform p through the homography matrix H.
 
         Args:
             p: (l, 2) numpy array, interest points
             H: (3, 3) numpy array, homography matrix
-        
+
         Returns:
             points: (l, 2) numpy array, transformed points
         """
@@ -169,10 +176,12 @@ class Problem2:
 
         points = (H @ p_.T).T
 
-        # normalization to reduce 3nd dimension in points
+        # normalization to reduce 3nd dimension in points (go back to non-homogenous coordinate)
         for i, point in enumerate(points):
             if point[-1] != 0:
                 point = point / point[-1]
+            else:
+                point = np.zeros((1, 3))
             points[i, :] = point
 
         return points[:, :2]
@@ -185,7 +194,7 @@ class Problem2:
             H: (3, 3) numpy array, homography matrix
             p1: (l, 2) numpy array, interest points in img1
             p2: (l, 2) numpy array, interest points in img2
-        
+
         Returns:
             dist: (l, ) numpy array containing the distances
         """
@@ -194,19 +203,19 @@ class Problem2:
         # You code here
 
         dist = np.linalg.norm(self.transform_pts(p1, H) - p2, axis=1) ** 2 + \
-                   np.linalg.norm(p1 - self.transform_pts(p2, np.linalg.pinv(H)), axis=1) ** 2
+               np.linalg.norm(p1 - self.transform_pts(p2, np.linalg.pinv(H)), axis=1) ** 2
 
         return dist
         #
 
     def find_inliers(self, pairs, dist, threshold):
-        """ Return and count inliers based on the homography distance. 
+        """ Return and count inliers based on the homography distance.
 
         Args:
             pairs: (l, 4) numpy array containing keypoint pairs
             dist: (l, ) numpy array, homography distances for k points
             threshold: inlier detection threshold
-        
+
         Returns:
             N: number of inliers
             inliers: (N, 4)
@@ -214,9 +223,9 @@ class Problem2:
 
         #
         # You code here
-        if (dist < threshold).any():
-            N = np.sum(dist < threshold)
-            inliers = pairs[np.where(dist < threshold)]
+        if (dist <= threshold).any():
+            N = np.sum(dist <= threshold)
+            inliers = pairs[np.where(dist <= threshold)]
         else:
             N = 0
             inliers = np.empty((N, 4))
@@ -231,7 +240,7 @@ class Problem2:
             p: probability that any given correspondence is valid
             k: number of pairs
             z: total probability of success after all iterations
-        
+
         Returns:
             minimum number of required iterations
         """
@@ -249,7 +258,7 @@ class Problem2:
             n_iters: number of ransac iterations
             k: number of samples drawn per iteration
             threshold: inlier detection threshold
-        
+
         Returns:
             H: (3, 3) numpy array, best homography observed during RANSAC
             max_inliers: number of inliers N
@@ -261,25 +270,34 @@ class Problem2:
         dist_ = 0
         H = np.empty((3, 3))
         max_inliers = 0
+        best_inliers = 0
         inliers = []
 
         for i in range(n_iters):
+            # estimate homography based on random sample paris
             p1, p2 = self.pick_samples(pairs[:, :2], pairs[:, 2:], k)
             p1_ps, T_p1 = self.condition_points(p1)
             p2_ps, T_p2 = self.condition_points(p2)
             H_i, _ = self.compute_homography(p1_ps, p2_ps, T_p1, T_p2)
-            dist = self.compute_homography_distance(H_i, p1, p2)
+
+            # transform all points and measure distance
+            dist = self.compute_homography_distance(H_i, pairs[:, :2], pairs[:, 2:])
             N_i, inliers_i = self.find_inliers(pairs, dist, threshold)
 
             # means of the homography distance specified above
             dist_mean = np.mean(dist)
-            if N_i >= max_inliers and dist_mean < dist_:
+
+            if N_i > best_inliers or \
+                    (N_i == best_inliers and dist_mean < dist_):
                 H = H_i
+                dist_ = dist_mean
+                best_inliers = N_i
 
             if len(inliers_i) != 0:
                 max_inliers += N_i
                 for inlier in inliers_i:
                     inliers.append(inlier.tolist())
+                    print(inlier)
 
         return H, max_inliers, np.asarray(inliers)
         #
@@ -289,7 +307,7 @@ class Problem2:
 
         Args:
             inliers: (N, 4) numpy array containing coordinate pairs of the inlier points
-        
+
         Returns:
             H: (3, 3) numpy array, recomputed homography matrix
         """
